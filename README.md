@@ -13,7 +13,3 @@ Cost Reduction: Lower maintenance and downtime costs through early detection.
 Operational Efficiency: Improve equipment availability in high-dependency areas like ICU, Surgery, etc.
 
 Scalable Solution: Designed to work across various departments and equipment types.
-
-### Currently working on: Database integration and FastAPI
-
-### Next Step: React frontend.
