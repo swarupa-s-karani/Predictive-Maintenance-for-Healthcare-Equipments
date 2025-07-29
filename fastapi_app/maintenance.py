@@ -956,3 +956,35 @@ def manually_reset_predictions(
             status_code=500,
             detail=f"Failed to reset health predictions: {str(e)}"
         )
+    
+# Add this route to your fastapi_app/maintenance.py file
+
+@router.get("/maintenance-types")
+def get_maintenance_types(user=Depends(get_current_user)):
+    """Get unique maintenance types from maintenance_logs table"""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("""
+            SELECT DISTINCT maintenance_type 
+            FROM maintenance_logs 
+            WHERE maintenance_type IS NOT NULL 
+            AND maintenance_type != ''
+            ORDER BY maintenance_type
+        """)
+        
+        types = [row[0] for row in cursor.fetchall()]
+        
+        # If no types found, return common defaults
+        if not types:
+            types = ['Preventive', 'Corrective', 'Replacement']
+            
+        return {"maintenance_types": types}
+        
+    except Exception as e:
+        print(f"Error fetching maintenance types: {str(e)}")
+        # Return fallback types
+        return {"maintenance_types": ['Preventive', 'Corrective', 'Replacement']}
+    finally:
+        conn.close()

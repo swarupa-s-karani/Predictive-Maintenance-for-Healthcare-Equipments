@@ -32,7 +32,9 @@ export default function AdminEquipments() {
   const [serviceRating, setServiceRating] = useState('');
   const [completionStatus, setCompletionStatus] = useState('');
   const [alert, setAlert] = useState({ show: false, message: '', type: '' });
-
+  const [selectedMaintenanceType, setSelectedMaintenanceType] = useState('');
+  const [maintenanceTypes, setMaintenanceTypes] = useState([]);
+  const [customMaintenanceType, setCustomMaintenanceType] = useState('');
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
 
@@ -47,6 +49,7 @@ export default function AdminEquipments() {
   useEffect(() => {
     fetchData();
     fetchPendingReviews();
+    fetchMaintenanceTypes();
   }, []);
 
   
@@ -195,8 +198,15 @@ export default function AdminEquipments() {
   };
 
   const handleSchedule = async () => {
-    if (!issueDescription) {
+    const maintenanceTypeToUse = scheduleForm.maintenance_type === 'Other' ? customMaintenanceType : scheduleForm.maintenance_type;
+    
+    if (!issueDescription || !scheduleForm.maintenance_type) {
       showAlert("Please fill all fields before submitting.");
+      return;
+    }
+    
+    if (scheduleForm.maintenance_type === 'Other' && !customMaintenanceType.trim()) {
+      showAlert("Please specify the custom maintenance type.");
       return;
     }
 
@@ -204,8 +214,7 @@ export default function AdminEquipments() {
       const res = await api.put(
           `/maintenance-log/schedule/${scheduleForm.id}`,
         {
-          maintenance_type: "Preventive",
-          // technician_id: null, // null if not auto-assigned
+          maintenance_type: maintenanceTypeToUse, // Use custom type if Other selected
           date: selectedDate.toISOString().split("T")[0],
           issue_description: issueDescription,
         },
@@ -215,8 +224,9 @@ export default function AdminEquipments() {
       showAlert(res.data.message || "Maintenance scheduled successfully.");
       setScheduleForm({ show: false, id: '', maintenance_type: '', technician_id: '', date: '', issue_description: '' });
       setIssueDescription("");
+      setSelectedMaintenanceType(''); // Reset maintenance type
+      setCustomMaintenanceType(''); // Reset custom type
 
-      // Re-fetch all updated data after scheduling
       await fetchData();
 
     } catch (err) {
@@ -224,7 +234,6 @@ export default function AdminEquipments() {
       console.error(err);
     }
   };
-
 
   const getBadge = (id) => {
     const info = healthMap[id];
@@ -240,6 +249,18 @@ export default function AdminEquipments() {
     );
   };
 
+  const fetchMaintenanceTypes = async () => {
+    try {
+      const res = await api.get('/maintenance-log/maintenance-types', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setMaintenanceTypes(res.data.maintenance_types || []);
+    } catch (error) {
+      console.error("Error fetching maintenance types:", error);
+      // Fallback to common types if API fails
+      setMaintenanceTypes(['Preventive', 'Corrective', 'Replacement']);
+    }
+  };
   
   // Update the handleReviewMaintenance function in AdminEquipments.jsx
 
@@ -663,6 +684,7 @@ export default function AdminEquipments() {
                           setSelectedEquipmentId(selectedEquipmentId === id ? null : id);
                           setSelectedDate(new Date());
                           setIssueDescription('');
+                          setSelectedMaintenanceType(''); // Reset maintenance type when switching equipment
                         }}
                         className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-4 py-2 rounded-lg hover:from-blue-700 hover:to-cyan-700 transition-colors font-medium"
                       >
@@ -689,27 +711,84 @@ export default function AdminEquipments() {
                           className="rounded-xl border-none shadow-sm bg-white"
                         />
                       </div>
-                      <div>
-                        <textarea
-                          placeholder="Describe the maintenance issue..."
-                          value={issueDescription}
-                          onChange={(e) => setIssueDescription(e.target.value)}
-                          rows={6}
-                          className="w-full border border-gray-300 p-4 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-                        />
+                      <div className="space-y-4">
+                        {/* Maintenance Type Selector */}
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Maintenance Type *
+                          </label>
+                          <select
+                            value={selectedMaintenanceType}
+                            onChange={(e) => {
+                              setSelectedMaintenanceType(e.target.value);
+                              if (e.target.value !== 'Other') {
+                                setCustomMaintenanceType(''); // Clear custom type if not Other
+                              }
+                            }}
+                            className="w-full border border-gray-300 p-3 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                            required
+                          >
+                            <option value="">Select Maintenance Type</option>
+                            {maintenanceTypes.map(type => (
+                              <option key={type} value={type}>{type}</option>
+                            ))}
+                            <option value="Other">Other (Specify)</option>
+                          </select>
+                          
+                          {/* Custom Maintenance Type Input */}
+                          {selectedMaintenanceType === 'Other' && (
+                            <div className="mt-3">
+                              <label className="block text-sm font-medium text-gray-600 mb-1">
+                                Specify Maintenance Type *
+                              </label>
+                              <input
+                                type="text"
+                                value={customMaintenanceType}
+                                onChange={(e) => setCustomMaintenanceType(e.target.value)}
+                                placeholder="Enter custom maintenance type..."
+                                className="w-full border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                                required
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Issue Description */}
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Issue Description *
+                          </label>
+                          <textarea
+                            placeholder="Describe the maintenance issue or requirements..."
+                            value={issueDescription}
+                            onChange={(e) => setIssueDescription(e.target.value)}
+                            rows={6}
+                            className="w-full border border-gray-300 p-4 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                            required
+                          />
+                        </div>
+
                         <button
                           className="w-full mt-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-green-700 hover:to-emerald-700 transition-colors"
                           onClick={async () => {
-                            if (!selectedDate || !issueDescription) {
-                              showAlert("Please select a date and provide an issue description.");
+                            // Validation - now includes maintenance type and custom type if Other is selected
+                            const maintenanceTypeToUse = selectedMaintenanceType === 'Other' ? customMaintenanceType : selectedMaintenanceType;
+                            
+                            if (!selectedDate || !issueDescription || !selectedMaintenanceType) {
+                              showAlert("Please select a date, maintenance type, and provide an issue description.");
+                              return;
+                            }
+                            
+                            if (selectedMaintenanceType === 'Other' && !customMaintenanceType.trim()) {
+                              showAlert("Please specify the custom maintenance type.");
                               return;
                             }
 
                             try {
-                              const res = await axios.put(
-                                `http://localhost:8000/maintenance-log/schedule/${id}`,
+                              const res = await api.put(
+                                `/maintenance-log/schedule/${id}`,
                                 {
-                                  maintenance_type: "Preventive",
+                                  maintenance_type: maintenanceTypeToUse, // Use custom type if Other selected
                                   date: selectedDate.toISOString().split("T")[0],
                                   issue_description: issueDescription,
                                 },
@@ -723,6 +802,8 @@ export default function AdminEquipments() {
                               showAlert(res.data.message || "Maintenance scheduled successfully.");
                               setSelectedEquipmentId(null);
                               setIssueDescription('');
+                              setSelectedMaintenanceType(''); // Reset maintenance type
+                              setCustomMaintenanceType(''); // Reset custom type
                               
                               setScheduledMap(prev => ({ ...prev, [id]: true }));
                               await fetchData();
@@ -739,6 +820,7 @@ export default function AdminEquipments() {
                     </div>
                   </div>
                 )}
+
               </div>
             ))}
           </div>
@@ -945,10 +1027,11 @@ export default function AdminEquipments() {
               <div className="flex justify-end gap-4 mt-8">
                 <button
                   onClick={() => {
-                    setShowReviewModal(false);
-                    setServiceRating('');
-                    setCompletionStatus('');
-                    setReviewData({});
+                    setSelectedEquipmentId(selectedEquipmentId === id ? null : id);
+                    setSelectedDate(new Date());
+                    setIssueDescription('');
+                    setSelectedMaintenanceType(''); // Reset maintenance type when switching equipment
+                    setCustomMaintenanceType(''); // Reset custom maintenance type
                   }}
                   className="px-6 py-3 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition-colors"
                 >
