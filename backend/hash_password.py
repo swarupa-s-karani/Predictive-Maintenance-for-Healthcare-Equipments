@@ -1,15 +1,4 @@
-#import sqlite3
-
-#conn = sqlite3.connect("hospital_equipment_system.db")
-#cursor = conn.cursor()
-#cursor.execute("SELECT username, password, role FROM personnel")
-#rows = cursor.fetchall()
-#for row in rows:
-#    print("Username:", row[0], "| Password:", row[1], "| Role:", row[2])
-#conn.close()
-
-
-# fastapi_app/ hash_password.py
+# backend/hash_password.py
 from passlib.context import CryptContext
 import sqlite3
 

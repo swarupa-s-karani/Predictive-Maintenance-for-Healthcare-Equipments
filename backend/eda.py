@@ -1,4 +1,4 @@
-# fastapi_app/eda.py
+# backend/eda.py
 import base64
 from fastapi import APIRouter, Response
 from generate_eda_image import generate_eda_image

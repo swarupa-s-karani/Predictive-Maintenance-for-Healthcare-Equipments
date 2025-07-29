@@ -1,4 +1,4 @@
-#database.py
+#backend/database.py
 import sqlite3
 import os
 

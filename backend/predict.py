@@ -1,4 +1,4 @@
-#fastapi_app/predict.py
+#backend/predict.py
 from fastapi import APIRouter, Depends
 from fastapi_app.dependencies import get_current_user
 import numpy as np

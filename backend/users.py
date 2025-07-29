@@ -1,5 +1,4 @@
-#users.py
-# fastapi_app/users.py
+# backend/users.py
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 import sqlite3

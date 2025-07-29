@@ -1,4 +1,4 @@
-#fastapi_app/equipments.py
+#backend/equipments.py
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import JSONResponse
 from typing import Optional

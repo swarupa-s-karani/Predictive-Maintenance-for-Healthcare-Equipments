@@ -1,4 +1,4 @@
-# fastapi_app/llm_engine.py - Updated to use Groq API
+# backend/llm_engine.py - Updated to use Groq API
 import requests
 import base64
 import os

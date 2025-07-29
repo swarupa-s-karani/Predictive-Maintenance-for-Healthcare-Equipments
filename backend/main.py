@@ -1,4 +1,4 @@
-#frontend/main.py
+#backend/main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_app.auth import router as auth_router
