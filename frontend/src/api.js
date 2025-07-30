@@ -1,18 +1,10 @@
-// src/api.js
-//import axios from 'axios';
-
-//const api = axios.create({
-//  baseURL: 'http://127.0.0.1:8000',
-//  withCredentials: false,         // Make sure cookies aren't expected
-//});
-
-//export default api;
-
 // frontend/src/api.js
 import axios from 'axios';
 
-// Use Vite's environment variable format, with fallback
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+// CHANGE: Use VITE_API_BASE_URL instead of VITE_BACKEND_URL
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://hospital-equipment-backend.onrender.com';
+
+console.log('Frontend connecting to:', API_BASE_URL); // For debugging
 
 const api = axios.create({
   baseURL: API_BASE_URL,

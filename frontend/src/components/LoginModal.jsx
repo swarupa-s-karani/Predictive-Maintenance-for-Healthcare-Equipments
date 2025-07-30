@@ -1,3 +1,4 @@
+//frontend/src/components/LoginModal.jsx
 import React, { useState } from 'react';
 
 function LoginModal({ onClose }) {

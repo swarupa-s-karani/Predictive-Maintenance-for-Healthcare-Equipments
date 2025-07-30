@@ -1,4 +1,4 @@
-/* print-styles.css */
+/* frontend/src/pages/print-styles.css */
 @media print {
   /* Hide everything except the print report */
   body * {

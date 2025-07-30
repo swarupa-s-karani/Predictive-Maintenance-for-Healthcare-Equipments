@@ -1,4 +1,4 @@
-// src/pages/BiomedicalLogs.jsx
+// frontend/src/pages/BiomedicalLogs.jsx
 import { useEffect, useState } from "react";
 import api from "../api";
 

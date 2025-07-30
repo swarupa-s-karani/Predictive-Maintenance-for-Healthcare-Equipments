@@ -1,4 +1,4 @@
-// src/pages/home.jsx - Updated for Hospital Equipment Predictive Maintenance
+// frontend/src/pages/home.jsx - Updated for Hospital Equipment Predictive Maintenance
 import { Link } from 'react-router-dom';
 
 export default function Home() {

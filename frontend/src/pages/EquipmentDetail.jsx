@@ -77,7 +77,7 @@ export default function EquipmentDetail() {
         setUserRole(profileRes.data.role);
       } catch (err) {
         console.error("Error fetching user profile:", err.response?.status, err.response?.data);
-        setUserRole("guest"); // fallback
+        setUserRole("guest"); 
       }
 
       // 2. Fetch basic equipment info - Updated to use api instance
@@ -90,10 +90,10 @@ export default function EquipmentDetail() {
       } catch (err) {
         console.error("Error fetching equipment:", err);
         showAlert("Could not load equipment information. Please check if the equipment exists.", 'error');
-        return; // Exit early if equipment doesn't exist
+        return;
       }
 
-      // 3. Fetch metrics and chart data - FIXED: Use import.meta.env instead of process.env
+      // 3. Fetch metrics and chart data - FIXED
       try {
         console.log("Fetching metrics for equipment:", id);
         const metricsRes = await api.get(`/maintenance-log/metrics/${id}`, {
@@ -104,8 +104,8 @@ export default function EquipmentDetail() {
         const metricsData = metricsRes.data;
         
         if (metricsData.chart_filename) {
-          // FIXED: Use import.meta.env for Vite or fallback to localhost
-          const backendURL = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000';
+          // FIXED: Get base URL from api instance
+          const backendURL = api.defaults.baseURL;
           const chartUrl = `${backendURL}/charts/${metricsData.chart_filename}`;
           console.log("Setting chart URL:", chartUrl);
           setPlot(chartUrl);
