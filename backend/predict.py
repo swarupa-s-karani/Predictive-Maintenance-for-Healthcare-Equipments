@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import sqlite3
 import joblib
-from tensorflow.keras.models import load_model
 import os
 from database import get_db
 from datetime import datetime, timedelta
@@ -13,9 +12,74 @@ from datetime import datetime, timedelta
 router = APIRouter()
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-lstm_model = load_model(os.path.join(BASE_DIR, "saved_models", "lstm_model.h5"))
-lgbm_model = joblib.load(os.path.join(BASE_DIR, "saved_models", "lgbm_model.pkl"))
-scaler = joblib.load(os.path.join(BASE_DIR, "saved_models", "scaler.pkl"))
+
+# Safe model loading with error handling
+lstm_model = None
+lgbm_model = None
+scaler = None
+
+try:
+    from tensorflow.keras.models import load_model
+    lstm_model = load_model(os.path.join(BASE_DIR, "saved_models", "lstm_model.h5"))
+    print("LSTM model loaded successfully")
+except Exception as e:
+    print(f"Warning: Could not load LSTM model: {e}")
+    print("Will use fallback prediction method")
+
+try:
+    lgbm_model = joblib.load(os.path.join(BASE_DIR, "saved_models", "lgbm_model.pkl"))
+    print("LightGBM model loaded successfully")
+except Exception as e:
+    print(f"Warning: Could not load LightGBM model: {e}")
+
+try:
+    scaler = joblib.load(os.path.join(BASE_DIR, "saved_models", "scaler.pkl"))
+    print("Scaler loaded successfully")
+except Exception as e:
+    print(f"Warning: Could not load scaler: {e}")
+
+def fallback_prediction(features_df):
+    """
+    Simple rule-based prediction when ML models fail
+    Based on equipment health indicators
+    """
+    predictions = []
+    probabilities = []
+    
+    for _, row in features_df.iterrows():
+        # Simple rule-based logic
+        score = 0
+        
+        # High usage hours indicate more wear
+        if row['usage_hours'] > 8000:
+            score += 0.3
+        elif row['usage_hours'] > 6000:
+            score += 0.2
+        
+        # High error count is concerning
+        if row['error_count'] > 5:
+            score += 0.4
+        elif row['error_count'] > 2:
+            score += 0.2
+        
+        # High CPU temperature indicates stress
+        if row['avg_cpu_temp'] > 75:
+            score += 0.3
+        elif row['avg_cpu_temp'] > 65:
+            score += 0.1
+        
+        # High workload level
+        if row['workload_level'] > 80:
+            score += 0.2
+        
+        # Cap the score at 1.0
+        prob = min(score, 0.95)
+        pred = 1 if prob > 0.4 else 0
+        
+        predictions.append(pred)
+        probabilities.append(prob)
+    
+    return np.array(predictions), np.array(probabilities)
 
 def should_skip_prediction_update(equipment_id, cursor):
     """
@@ -93,20 +157,50 @@ def predict_maintenance(user=Depends(get_current_user)):
         eq_data = df[df["equipment_id"] == eq_id]
         if len(eq_data) >= 5:
             recent_logs = eq_data.head(5).sort_values("timestamp")
-            X_scaled = scaler.transform(recent_logs[features])
-            sequences.append(X_scaled)
+            sequences.append(recent_logs[features])
             equipment_map.append(eq_id)
 
     if not sequences:
         return {"message": "Not enough data for any equipment."}
 
-    X_seq = np.array(sequences)
-    X_flat = X_seq.reshape(X_seq.shape[0], -1)
+    # Try ML prediction first, fallback to rule-based if failed
+    prediction_method = "fallback"
+    
+    if lstm_model is not None and lgbm_model is not None and scaler is not None:
+        try:
+            # Original ML prediction logic
+            sequences_scaled = []
+            for seq_df in sequences:
+                X_scaled = scaler.transform(seq_df)
+                sequences_scaled.append(X_scaled)
+            
+            X_seq = np.array(sequences_scaled)
+            X_flat = X_seq.reshape(X_seq.shape[0], -1)
 
-    lstm_probs = lstm_model.predict(X_seq).flatten()
-    lgbm_probs = lgbm_model.predict_proba(X_flat)[:, 1]
-    ensemble_probs = (lstm_probs + lgbm_probs) / 2
-    ensemble_preds = (ensemble_probs > 0.4).astype(int)
+            lstm_probs = lstm_model.predict(X_seq).flatten()
+            lgbm_probs = lgbm_model.predict_proba(X_flat)[:, 1]
+            ensemble_probs = (lstm_probs + lgbm_probs) / 2
+            ensemble_preds = (ensemble_probs > 0.4).astype(int)
+            prediction_method = "ml_ensemble"
+            
+        except Exception as e:
+            print(f"ML prediction failed: {e}")
+            print("Falling back to rule-based prediction")
+            # Use the most recent data for each equipment
+            latest_data = []
+            for seq_df in sequences:
+                latest_data.append(seq_df.iloc[-1])  # Most recent entry
+            
+            features_df = pd.DataFrame(latest_data)
+            ensemble_preds, ensemble_probs = fallback_prediction(features_df)
+    else:
+        # Use rule-based prediction
+        latest_data = []
+        for seq_df in sequences:
+            latest_data.append(seq_df.iloc[-1])  # Most recent entry
+        
+        features_df = pd.DataFrame(latest_data)
+        ensemble_preds, ensemble_probs = fallback_prediction(features_df)
 
     today = pd.Timestamp.today().strftime('%Y-%m-%d')
     results = []
@@ -153,6 +247,7 @@ def predict_maintenance(user=Depends(get_current_user)):
     
     return {
         "predictions": results,
+        "prediction_method": prediction_method,
         "summary": {
             "total_equipment": len(equipment_map),
             "updated": len(equipment_map) - skipped_count,
@@ -198,20 +293,50 @@ def force_predict_maintenance(user=Depends(get_current_user)):
         eq_data = df[df["equipment_id"] == eq_id]
         if len(eq_data) >= 5:
             recent_logs = eq_data.head(5).sort_values("timestamp")
-            X_scaled = scaler.transform(recent_logs[features])
-            sequences.append(X_scaled)
+            sequences.append(recent_logs[features])
             equipment_map.append(eq_id)
 
     if not sequences:
         return {"message": "Not enough data for any equipment."}
 
-    X_seq = np.array(sequences)
-    X_flat = X_seq.reshape(X_seq.shape[0], -1)
+    # Try ML prediction first, fallback to rule-based if failed
+    prediction_method = "fallback"
+    
+    if lstm_model is not None and lgbm_model is not None and scaler is not None:
+        try:
+            # Original ML prediction logic
+            sequences_scaled = []
+            for seq_df in sequences:
+                X_scaled = scaler.transform(seq_df)
+                sequences_scaled.append(X_scaled)
+            
+            X_seq = np.array(sequences_scaled)
+            X_flat = X_seq.reshape(X_seq.shape[0], -1)
 
-    lstm_probs = lstm_model.predict(X_seq).flatten()
-    lgbm_probs = lgbm_model.predict_proba(X_flat)[:, 1]
-    ensemble_probs = (lstm_probs + lgbm_probs) / 2
-    ensemble_preds = (ensemble_probs > 0.4).astype(int)
+            lstm_probs = lstm_model.predict(X_seq).flatten()
+            lgbm_probs = lgbm_model.predict_proba(X_flat)[:, 1]
+            ensemble_probs = (lstm_probs + lgbm_probs) / 2
+            ensemble_preds = (ensemble_probs > 0.4).astype(int)
+            prediction_method = "ml_ensemble"
+            
+        except Exception as e:
+            print(f"ML prediction failed: {e}")
+            print("Falling back to rule-based prediction")
+            # Use the most recent data for each equipment
+            latest_data = []
+            for seq_df in sequences:
+                latest_data.append(seq_df.iloc[-1])  # Most recent entry
+            
+            features_df = pd.DataFrame(latest_data)
+            ensemble_preds, ensemble_probs = fallback_prediction(features_df)
+    else:
+        # Use rule-based prediction
+        latest_data = []
+        for seq_df in sequences:
+            latest_data.append(seq_df.iloc[-1])  # Most recent entry
+        
+        features_df = pd.DataFrame(latest_data)
+        ensemble_preds, ensemble_probs = fallback_prediction(features_df)
 
     today = pd.Timestamp.today().strftime('%Y-%m-%d')
     results = []
@@ -233,4 +358,8 @@ def force_predict_maintenance(user=Depends(get_current_user)):
 
     conn.commit()
     conn.close()
-    return {"predictions": results, "note": "All predictions force updated, overriding post-maintenance resets"}
+    return {
+        "predictions": results, 
+        "prediction_method": prediction_method,
+        "note": "All predictions force updated, overriding post-maintenance resets"
+    }
