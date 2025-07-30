@@ -3,6 +3,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
+import sqlite3
+import pandas as pd
+import numpy as np
 from auth import router as auth_router
 from equipments import router as equipment_router
 from maintenance import router as maintenance_router
@@ -40,3 +43,12 @@ app.include_router(predict_router, prefix="/predict", tags=["Prediction"])
 app.include_router(user_router, prefix="/users", tags=["Users"])
 app.include_router(calendar_router, prefix="/calendar", tags=["Calendar"])
 app.include_router(eda_router)
+
+# Health check endpoint for Render
+@app.get("/health")
+def health_check():
+    return {"status": "healthy"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))

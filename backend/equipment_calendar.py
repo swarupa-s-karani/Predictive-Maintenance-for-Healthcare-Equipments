@@ -1,4 +1,4 @@
-#backend/calendar.py
+#backend/equipment_calendar.py
 from fastapi import APIRouter
 
 router = APIRouter()

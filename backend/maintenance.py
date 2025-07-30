@@ -306,7 +306,7 @@ def get_full_maintenance_priority(equipment_id: str, user=Depends(get_current_us
         "maintenance_needs": results
     }
 
-# fastapi_app/maintenance.py - updated LLM route
+# backend/maintenance.py - updated LLM route
 @router.get("/llm-explanation/{equipment_id}")
 def get_llm_explanation(equipment_id: str, user=Depends(get_current_user)):
     """Get LLM explanation separately - can fail without affecting metrics"""
@@ -495,7 +495,7 @@ def update_technician_progress(
 from typing import Optional
 ...
 
-# In fastapi_app/maintenance.py, update the schedule_maintenance endpoint:
+# In backend/maintenance.py, update the schedule_maintenance endpoint:
 @router.put("/schedule/{equipment_id}")
 def schedule_maintenance(
     equipment_id: str,
@@ -572,11 +572,11 @@ def schedule_maintenance(
         "maintenance_id": new_id
     }
 
-# in fastapi_app/maintenance.py
+# in backend/maintenance.py
 
 @router.get("/combined/{equipment_id}")
 def get_combined_equipment_data(equipment_id: str, user=Depends(get_current_user)):
-    from fastapi_app.llm_engine import generate_llm_explanation
+    from llm_engine import generate_llm_explanation
     import base64, os
 
     metrics = fetch_equipment_metrics(equipment_id)
@@ -709,7 +709,7 @@ def get_upcoming_maintenances(equipment_id: str, user=Depends(get_current_user))
 
     return {"upcoming_maintenances": [dict(zip(columns, row)) for row in rows]}
 
-# In fastapi_app/maintenance.py - Update the mark_maintenance_complete function
+# In backend/maintenance.py - Update the mark_maintenance_complete function
 
 @router.put("/mark-complete/{maintenance_id}", dependencies=[Depends(require_role("technician"))])
 def mark_maintenance_complete(
@@ -963,7 +963,7 @@ def manually_reset_predictions(
             detail=f"Failed to reset health predictions: {str(e)}"
         )
     
-# Add this route to your fastapi_app/maintenance.py file
+# Add this route to your backend/maintenance.py file
 
 @router.get("/maintenance-types")
 def get_maintenance_types(user=Depends(get_current_user)):

@@ -6,8 +6,9 @@ from jose import jwt
 from datetime import datetime, timedelta
 import sqlite3
 from database import get_db
+import os
 
-SECRET_KEY = "your-secret-key"
+SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
@@ -25,7 +26,7 @@ def create_access_token(data: dict):
 
 @router.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    conn = get_db()  # ✅ Use the shared function
+    conn = get_db()  # Use the shared function
     cursor = conn.cursor()
     
     # Also update the SELECT query to include personnel_id
