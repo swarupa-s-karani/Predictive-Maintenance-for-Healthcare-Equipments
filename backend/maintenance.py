@@ -6,16 +6,17 @@ import sqlite3
 import pandas as pd
 import joblib
 from datetime import datetime
-from fastapi_app.llm_engine import generate_llm_explanation
-from fastapi_app.dependencies import get_current_user, require_role
+from llm_engine import generate_llm_explanation
+from dependencies import get_current_user, require_role
 from fastapi import File, UploadFile
 import base64
 from generate_equipment_report import fetch_equipment_metrics
+from database import get_db
+
+import os
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 router = APIRouter()
-
-def get_db():
-    return sqlite3.connect("hospital_equipment_system.db")
 
 # --- Base model for Technician ---
 class MaintenanceBase(BaseModel):
@@ -264,21 +265,21 @@ def get_full_maintenance_priority(equipment_id: str, user=Depends(get_current_us
         "needs_maintenance_10_days"
     ]
 
-    scaler = joblib.load("saved_models/multi_priority_scaler.pkl")
+    scaler = joblib.load(os.path.join(BASE_DIR, "saved_models", "multi_priority_scaler.pkl"))
     X_scaled = scaler.transform(features)
 
     def label(pred): return {0: "Low", 1: "Medium", 2: "High"}[pred]
 
     results = {}
     for mtype in ["preventive", "corrective", "replacement"]:
-        model = joblib.load(f"saved_models/{mtype}_model.pkl")
+        model = joblib.load(os.path.join(BASE_DIR, "saved_models", f"{mtype}_model.pkl"))
         pred = model.predict(X_scaled)[0]
         results[mtype] = label(pred)
 
     predicted_to_fail = bool(df["needs_maintenance_10_days"].iloc[0])
 
     # Save to database
-    conn = sqlite3.connect("hospital_equipment_system.db")
+    conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO maintenance_prediction_results (equipment_id, predicted_to_fail, preventive, corrective, replacement, last_updated)
@@ -311,7 +312,7 @@ def get_llm_explanation(equipment_id: str, user=Depends(get_current_user)):
     """Get LLM explanation separately - can fail without affecting metrics"""
     try:
         # FIXED: Import the correct function name
-        from fastapi_app.llm_engine import generate_llm_explanation
+        from llm_engine import generate_llm_explanation
         import os
 
         # Get metrics for LLM context
@@ -324,7 +325,7 @@ def get_llm_explanation(equipment_id: str, user=Depends(get_current_user)):
             chart_path = ""
 
         # Get maintenance prediction data for LLM context
-        conn = sqlite3.connect("hospital_equipment_system.db")
+        conn = get_db()
         query = """
         SELECT e.equipment_id, e.installation_date,
                COALESCE(SUM(m.downtime_hours), 0) AS downtime,
@@ -349,15 +350,17 @@ def get_llm_explanation(equipment_id: str, user=Depends(get_current_user)):
         features = df[["equipment_age", "downtime", "failures", "avg_response", "needs_maintenance_10_days"]]
         features.columns = ["equipment_age", "downtime_hours", "num_failures", "response_time_hours", "needs_maintenance_10_days"]
 
-        scaler = joblib.load("saved_models/multi_priority_scaler.pkl")
+        scaler = joblib.load(os.path.join(BASE_DIR, "saved_models", "multi_priority_scaler.pkl"))
         X_scaled = scaler.transform(features)
 
         def label(pred): return {0: "Low", 1: "Medium", 2: "High"}[pred]
+        
+        # FIXED: Use 'maintenance_needs' instead of 'results'
         maintenance_needs = {}
         for mtype in ["preventive", "corrective", "replacement"]:
-            model = joblib.load(f"saved_models/{mtype}_model.pkl")
+            model = joblib.load(os.path.join(BASE_DIR, "saved_models", f"{mtype}_model.pkl"))
             pred = model.predict(X_scaled)[0]
-            maintenance_needs[mtype] = label(pred)
+            maintenance_needs[mtype] = label(pred)  # FIXED: Changed from results[mtype] to maintenance_needs[mtype]
 
         # Prepare data for LLM - FIXED: Use the correct structure
         llm_metrics = {
@@ -399,22 +402,25 @@ def get_llm_explanation(equipment_id: str, user=Depends(get_current_user)):
 
 @router.get("/metrics/{equipment_id}")
 def get_equipment_metrics_only(equipment_id: str, user=Depends(get_current_user)):
-    """Get equipment metrics and chart without LLM explanation"""
-    import base64, os
+    """Get equipment metrics and chart without LLM explanation - Updated for Render deployment"""
+    import os
     
     # Get full metrics from existing function
     metrics = fetch_equipment_metrics(equipment_id)
     
-    # Get chart
+    # Get chart path and convert to filename for static serving
     chart_path = metrics.get("chart_path")
-    if not os.path.exists(chart_path):
-        raise HTTPException(status_code=404, detail="Trend chart not found")
-
-    with open(chart_path, "rb") as img_file:
-        base64_chart = base64.b64encode(img_file.read()).decode()
+    chart_filename = ""
+    
+    if chart_path and os.path.exists(chart_path):
+        # Extract just the filename from the full path
+        chart_filename = os.path.basename(chart_path)
+        print(f"Chart filename: {chart_filename}")
+    else:
+        print(f"Chart not found at path: {chart_path}")
 
     # Get maintenance predictions (this is where downtime, failures, response time come from)
-    conn = sqlite3.connect("hospital_equipment_system.db")
+    conn = get_db()
     query = """
     SELECT e.equipment_id, e.installation_date,
            COALESCE(SUM(m.downtime_hours), 0) AS downtime,
@@ -439,19 +445,19 @@ def get_equipment_metrics_only(equipment_id: str, user=Depends(get_current_user)
     features = df[["equipment_age", "downtime", "failures", "avg_response", "needs_maintenance_10_days"]]
     features.columns = ["equipment_age", "downtime_hours", "num_failures", "response_time_hours", "needs_maintenance_10_days"]
 
-    scaler = joblib.load("saved_models/multi_priority_scaler.pkl")
+    scaler = joblib.load(os.path.join(BASE_DIR, "saved_models", "multi_priority_scaler.pkl"))
     X_scaled = scaler.transform(features)
 
     def label(pred): return {0: "Low", 1: "Medium", 2: "High"}[pred]
     results = {}
     for mtype in ["preventive", "corrective", "replacement"]:
-        model = joblib.load(f"saved_models/{mtype}_model.pkl")
+        model = joblib.load(os.path.join(BASE_DIR, "saved_models", f"{mtype}_model.pkl"))
         pred = model.predict(X_scaled)[0]
         results[mtype] = label(pred)
 
     return {
         "equipment_id": equipment_id,
-        "image_base64": base64_chart,
+        "chart_filename": chart_filename,  # NEW: Return filename instead of base64
         "metrics": {
             "equipment_id": metrics["equipment_id"],
             "usage_hours": metrics.get("usage_hours", 0),
@@ -583,7 +589,7 @@ def get_combined_equipment_data(equipment_id: str, user=Depends(get_current_user
         base64_chart = base64.b64encode(img_file.read()).decode()
 
     # Priority prediction
-    conn = sqlite3.connect("hospital_equipment_system.db")
+    conn = get_db()
     query = """
     SELECT e.equipment_id, e.installation_date,
            COALESCE(SUM(m.downtime_hours), 0) AS downtime,
@@ -607,13 +613,13 @@ def get_combined_equipment_data(equipment_id: str, user=Depends(get_current_user
     features = df[["equipment_age", "downtime", "failures", "avg_response", "needs_maintenance_10_days"]]
     features.columns = ["equipment_age", "downtime_hours", "num_failures", "response_time_hours", "needs_maintenance_10_days"]
 
-    scaler = joblib.load("saved_models/multi_priority_scaler.pkl")
+    scaler = joblib.load(os.path.join(BASE_DIR, "saved_models", "multi_priority_scaler.pkl"))
     X_scaled = scaler.transform(features)
 
     def label(pred): return {0: "Low", 1: "Medium", 2: "High"}[pred]
     results = {}
     for mtype in ["preventive", "corrective", "replacement"]:
-        model = joblib.load(f"saved_models/{mtype}_model.pkl")
+        model = joblib.load(os.path.join(BASE_DIR, "saved_models", f"{mtype}_model.pkl"))
         pred = model.predict(X_scaled)[0]
         results[mtype] = label(pred)
 
@@ -638,7 +644,7 @@ def get_all_equipment_health(user=Depends(get_current_user)):
     if user_role not in allowed_roles:
         raise HTTPException(status_code=403, detail="Insufficient permissions to view health status")
     
-    conn = sqlite3.connect("hospital_equipment_system.db")
+    conn = get_db()
     cursor = conn.cursor()
 
     cursor.execute("SELECT equipment_id FROM equipment")

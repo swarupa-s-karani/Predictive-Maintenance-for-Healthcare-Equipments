@@ -6,13 +6,11 @@ from pydantic import BaseModel
 import matplotlib.pyplot as plt
 import sqlite3, io, base64, os
 import pandas as pd
+from database import get_db
 
-from fastapi_app.dependencies import get_current_user, require_role
+from dependencies import get_current_user, require_role
 
 router = APIRouter()
-
-def get_db():
-    return sqlite3.connect("hospital_equipment_system.db")
 
 # Pydantic model
 class EquipmentIn(BaseModel):

@@ -1,10 +1,11 @@
 # backend/hash_password.py
 from passlib.context import CryptContext
 import sqlite3
+from database import get_db
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-conn = sqlite3.connect("hospital_equipment_system.db")
+conn = get_db()
 cursor = conn.cursor()
 cursor.execute("SELECT username, password FROM personnel")
 rows = cursor.fetchall()

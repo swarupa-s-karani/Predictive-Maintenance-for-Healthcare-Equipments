@@ -1,20 +1,21 @@
 #backend/predict.py
 from fastapi import APIRouter, Depends
-from fastapi_app.dependencies import get_current_user
+from dependencies import get_current_user
 import numpy as np
 import pandas as pd
 import sqlite3
 import joblib
 from tensorflow.keras.models import load_model
 import os
+from database import get_db
 from datetime import datetime, timedelta
 
 router = APIRouter()
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-lstm_model = load_model(os.path.join(BASE_DIR, "..", "saved_models", "lstm_model.h5"))
-lgbm_model = joblib.load(os.path.join(BASE_DIR, "..", "saved_models", "lgbm_model.pkl"))
-scaler = joblib.load(os.path.join(BASE_DIR, "..", "saved_models", "scaler.pkl"))
+lstm_model = load_model(os.path.join(BASE_DIR, "saved_models", "lstm_model.h5"))
+lgbm_model = joblib.load(os.path.join(BASE_DIR, "saved_models", "lgbm_model.pkl"))
+scaler = joblib.load(os.path.join(BASE_DIR, "saved_models", "scaler.pkl"))
 
 def should_skip_prediction_update(equipment_id, cursor):
     """
@@ -60,7 +61,7 @@ def should_skip_prediction_update(equipment_id, cursor):
 
 @router.post("/", summary="Predict maintenance for all equipment")
 def predict_maintenance(user=Depends(get_current_user)):
-    conn = sqlite3.connect("hospital_equipment_system.db")
+    conn = get_db()
     cursor = conn.cursor()
 
     # Create table if it doesn't exist
@@ -165,7 +166,7 @@ def force_predict_maintenance(user=Depends(get_current_user)):
     Force update all predictions, ignoring recent maintenance completions.
     Use this only when you want to override post-maintenance resets.
     """
-    conn = sqlite3.connect("hospital_equipment_system.db")
+    conn = get_db()
     cursor = conn.cursor()
 
     # Create table if it doesn't exist

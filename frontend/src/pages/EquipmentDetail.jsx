@@ -1,4 +1,4 @@
-// src/pages/EquipmentDetail.jsx
+// frontend/src/pages/EquipmentDetail.jsx
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import api from "../api"; // Using the same api instance as BiomedicalEquipments.jsx
@@ -93,7 +93,7 @@ export default function EquipmentDetail() {
         return; // Exit early if equipment doesn't exist
       }
 
-      // 3. Fetch metrics and chart data - Updated to use api instance
+      // 3. Fetch metrics and chart data - FIXED: Use import.meta.env instead of process.env
       try {
         console.log("Fetching metrics for equipment:", id);
         const metricsRes = await api.get(`/maintenance-log/metrics/${id}`, {
@@ -103,8 +103,15 @@ export default function EquipmentDetail() {
         console.log("Metrics response:", metricsRes.data);
         const metricsData = metricsRes.data;
         
-        if (metricsData.image_base64) {
-          setPlot(`data:image/png;base64,${metricsData.image_base64}`);
+        if (metricsData.chart_filename) {
+          // FIXED: Use import.meta.env for Vite or fallback to localhost
+          const backendURL = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000';
+          const chartUrl = `${backendURL}/charts/${metricsData.chart_filename}`;
+          console.log("Setting chart URL:", chartUrl);
+          setPlot(chartUrl);
+        } else {
+          console.log("No chart filename provided");
+          setPlot(null);
         }
         
         setMetrics(metricsData.metrics || {});

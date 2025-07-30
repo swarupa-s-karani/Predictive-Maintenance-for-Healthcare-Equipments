@@ -3,15 +3,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 import sqlite3
 from passlib.context import CryptContext
+from database import get_db
 
-from fastapi_app.dependencies import get_current_user, require_role
+from dependencies import get_current_user, require_role
 
 router = APIRouter()
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-def get_db():
-    return sqlite3.connect("hospital_equipment_system.db")
 
 # --- Pydantic Model for input ---
 class UserIn(BaseModel):

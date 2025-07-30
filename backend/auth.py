@@ -5,6 +5,7 @@ from passlib.context import CryptContext
 from jose import jwt
 from datetime import datetime, timedelta
 import sqlite3
+from database import get_db
 
 SECRET_KEY = "your-secret-key"
 ALGORITHM = "HS256"
@@ -24,23 +25,33 @@ def create_access_token(data: dict):
 
 @router.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    conn = sqlite3.connect("hospital_equipment_system.db")
+    conn = get_db()  # ✅ Use the shared function
     cursor = conn.cursor()
-    cursor.execute("SELECT username, password, role FROM personnel WHERE username = ?", (form_data.username,))
+    
+    # Also update the SELECT query to include personnel_id
+    cursor.execute("""
+        SELECT personnel_id, username, password, role 
+        FROM personnel WHERE username = ?
+    """, (form_data.username,))
     user = cursor.fetchone()
     conn.close()
 
-    if not user or not verify_password(form_data.password, user[1]):
+    if not user or not verify_password(form_data.password, user[2]):  # password is now index 2
         raise HTTPException(status_code=401, detail="Invalid username or password")
 
-    username = user[0]
-    role = user[2].lower().replace(" ", "")  # Fix: lowercase and remove spaces
+    personnel_id = user[0]  # personnel_id
+    username = user[1]      # username  
+    role = user[3].lower().replace(" ", "")  # role is now index 3
 
-    token = create_access_token({"sub": username, "role": role})
+    token = create_access_token({
+        "sub": username, 
+        "role": role,
+        "personnel_id": personnel_id  # Add this to token
+    })
 
     return {
         "access_token": token,
         "token_type": "bearer",
-        "role": role  # Return lowercase role to frontend
+        "role": role,
+        "personnel_id": personnel_id  # Return this to frontend
     }
-
