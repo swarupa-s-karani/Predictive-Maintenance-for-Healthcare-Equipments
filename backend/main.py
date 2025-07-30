@@ -19,17 +19,18 @@ load_dotenv()
 
 app = FastAPI(title="Hospital Equipment Maintenance API")
 
-# Enable CORS for your frontend
+# Enable CORS for your frontend - FIXED
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",  # React dev
         "http://127.0.0.1:5173",  # Just in case
-        "https://*.onrender.com",
-         "*"
+        "http://localhost:3000",  # Alternative React port
+        "https://hospital-equipment-frontend.onrender.com",  # Your specific frontend URL
+        "https://hospital-equipment-backend.onrender.com",   # Backend self-reference
     ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
