@@ -13,6 +13,9 @@ from predict import router as predict_router
 from users import router as user_router
 from equipment_calendar import router as calendar_router
 from eda import router as eda_router
+from dotenv import load_dotenv
+load_dotenv()
+
 
 app = FastAPI(title="Hospital Equipment Maintenance API")
 
