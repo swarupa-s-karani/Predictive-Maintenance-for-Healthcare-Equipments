@@ -1,4 +1,4 @@
-//frontend/vite.congig.js
+//frontend/vite.config.js
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -10,8 +10,12 @@ export default defineConfig({
     host: true, // Allow external connections
   },
   preview: {
-    port: process.env.PORT || 3000, // ← CHANGE: Use PORT env variable
-    host: '0.0.0.0', // ← CHANGE: Must be '0.0.0.0' for Render
+    port: process.env.PORT || 3000, // Use PORT env variable for Render
+    host: '0.0.0.0', // Must be '0.0.0.0' for Render
+    allowedHosts: [
+      'hospital-equipment-frontend.onrender.com',
+      '.onrender.com' // Allow any subdomain of onrender.com
+    ]
   },
   build: {
     outDir: 'dist',
