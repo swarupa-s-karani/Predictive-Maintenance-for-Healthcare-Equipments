@@ -1,6 +1,6 @@
 // frontend/src/App.jsx
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Home from './pages/Home';
+import Home from './pages/home';
 import Login from './pages/Login';
 import AdminEquipments from './pages/AdminEquipments';
 import BiomedicalEquipments from './pages/BiomedicalEquipments';
